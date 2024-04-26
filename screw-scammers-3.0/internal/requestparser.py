@@ -43,12 +43,9 @@ class RequestParser:
             cookies=entry['request']['cookies'],
             payload=entry['request']['postData'].get('params', [])
         )
-    
-    """
-    Optionally perform basic validation on the response to see if it matches the HAR file.
-    """
-    def send_request(self, validate_response: bool = False) -> tuple[requests.Response, tuple[bool, dict] | None]:
-        response = requests.request(
+
+    def make_request(self) -> requests.Request:
+        return requests.Request(
             method=self._parsed._method,
             url=self._parsed._host,
             headers=self._parsed._headers,
@@ -56,33 +53,11 @@ class RequestParser:
             data=self._parsed._payload
         )
 
-        if not validate_response:
-            return response, None
-        
-        try:
-            with open(self._file, 'r') as f:
-                data = json.load(f)
-        except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON file")
-        
-        entry = data['log']['entries'][self._entry_index]
-
-        valid = {
-            'status': response.status_code == entry['response']['status'],
-            'content': len(response.content) == entry['response']['content']['size'],
-        }
-
-        if not all(valid.values()):
-            return response, (False, valid)
-
-        return response, None
-
-
 if __name__ == '__main__':
     parser = RequestParser('config/request.json')
     print(parser._parsed)
     print(parser._parsed._payload)
-    req = parser.send_request(validate_response=True)
-    print(req.status_code)
-    print(req.text)
-    print(req)
+    req = parser.make_request()
+    preq = req.prepare()
+
+    requests.Session().send(preq)
